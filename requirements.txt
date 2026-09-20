@@ -1,0 +1,17 @@
+# Core agent
+anthropic>=1.0.0
+
+# Image forensics
+pillow>=10.0.0
+numpy>=1.26.0
+
+# Web UI + API
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+
+# MCP server (v2 API: mcp.server.mcpserver.MCPServer)
+mcp>=2.0.0
+
+# Tests
+pytest>=8.0.0
+httpx2>=0.1.0        # FastAPI TestClient

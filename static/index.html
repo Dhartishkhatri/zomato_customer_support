@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zia — Zomato Support</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1c1f23; --muted: #6b7280;
+    --line: #e5e7eb; --brand: #e23744; --brand-soft: #fdecee;
+    --ok: #0f9d58; --warn: #b7791f; --bad: #d93025;
+    --bubble-bot: #f1f3f5; --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161a; --panel: #1c1f24; --ink: #e8eaed; --muted: #9aa0a6;
+      --line: #2b2f36; --brand: #ff5a67; --brand-soft: #3a2024;
+      --bubble-bot: #24282f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px; padding: 12px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 20; flex-wrap: wrap;
+  }
+  .logo { font-weight: 700; color: var(--brand); font-size: 19px; letter-spacing: -.3px; }
+  .tag { font-size: 12px; color: var(--muted); }
+  .tabs { margin-left: auto; display: flex; gap: 6px; }
+  .tab {
+    padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line);
+    background: transparent; color: var(--ink); cursor: pointer; font-size: 13px;
+  }
+  .tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+  select, input, textarea, button { font: inherit; color: inherit; }
+  select, input, textarea {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px 11px;
+  }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 16px; }
+  .layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .card h3 {
+    margin: 0; padding: 12px 14px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line);
+  }
+  .card .body { padding: 14px; }
+
+  #chat { height: 60vh; min-height: 380px; overflow-y: auto; padding: 16px; }
+  .msg { display: flex; margin-bottom: 12px; }
+  .msg.me { justify-content: flex-end; }
+  .bubble {
+    max-width: 78%; padding: 10px 14px; border-radius: 16px;
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .msg.bot .bubble { background: var(--bubble-bot); border-bottom-left-radius: 4px; }
+  .msg.me .bubble { background: var(--brand); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.sys { justify-content: center; }
+  .msg.sys .bubble {
+    background: transparent; color: var(--muted); font-size: 12.5px;
+    text-align: center; max-width: 92%;
+  }
+  .meta { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+  .composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+  .composer input { flex: 1; }
+  .btn {
+    background: var(--brand); color: #fff; border: 0; border-radius: 10px;
+    padding: 9px 18px; cursor: pointer; font-weight: 600;
+  }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+
+  /* Action verification popup */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--panel); border-radius: 16px; padding: 22px;
+    max-width: 420px; width: 100%; border: 1px solid var(--line);
+  }
+  .modal h4 { margin: 0 0 8px; font-size: 17px; }
+  .modal p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+  .modal .row { display: flex; gap: 8px; justify-content: flex-end; }
+
+  .pill {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; border: 1px solid var(--line);
+  }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); }
+  .pill.bad { color: var(--bad); border-color: var(--bad); }
+
+  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0;
+        font-size: 13px; border-bottom: 1px dashed var(--line); }
+  .kv:last-child { border-bottom: 0; }
+  .kv span:first-child { color: var(--muted); }
+  .kv span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+  .stat { background: var(--panel); border: 1px solid var(--line);
+          border-radius: var(--radius); padding: 15px; }
+  .stat .label { font-size: 11.5px; text-transform: uppercase;
+                 letter-spacing: .06em; color: var(--muted); }
+  .stat .value { font-size: 28px; font-weight: 700; margin: 6px 0 2px;
+                 font-variant-numeric: tabular-nums; }
+  .stat .sub { font-size: 12px; color: var(--muted); }
+  .bar { height: 6px; background: var(--line); border-radius: 999px;
+         overflow: hidden; margin-top: 9px; }
+  .bar > i { display: block; height: 100%; background: var(--brand); }
+
+  pre { background: var(--bubble-bot); padding: 11px; border-radius: 10px;
+        font-size: 12px; overflow-x: auto; white-space: pre-wrap;
+        max-height: 260px; overflow-y: auto; margin: 0; }
+  .hidden { display: none !important; }
+  .dots span { animation: blink 1.3s infinite; }
+  .dots span:nth-child(2) { animation-delay: .2s; }
+  .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,60%,100% { opacity:.25 } 30% { opacity:1 } }
+  .stars { display: flex; gap: 5px; }
+  .star { cursor: pointer; font-size: 23px; color: var(--line); line-height: 1; }
+  .star.on { color: #f5a623; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">Zia</span>
+  <span class="tag">Zomato Support Agent</span>
+  <select id="customer" style="margin-left:14px"></select>
+  <button class="btn ghost" id="newChat">New chat</button>
+  <div class="tabs">
+    <button class="tab active" data-view="chatView">Chat</button>
+    <button class="tab" data-view="dashView">Dashboard</button>
+  </div>
+</header>
+
+<main>
+  <!-- ================= CHAT ================= -->
+  <div id="chatView">
+    <div class="layout">
+      <div class="card">
+        <div id="chat"></div>
+        <div class="composer">
+          <input id="input" placeholder="Type your concern…" autocomplete="off">
+          <button class="btn" id="send">Send</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <h3>This turn</h3>
+          <div class="body" id="turnInfo">
+            <div class="kv"><span>Waiting for a message…</span><span></span></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:14px">
+          <h3>Account &amp; orders</h3>
+          <div class="body" id="orders" style="font-size:13px"></div>
+        </div>
+
+        <div class="card" id="rateCard">
+          <h3>Rate this chat</h3>
+          <div class="body">
+            <div class="stars" id="stars"></div>
+            <div id="rateDone" class="meta hidden">Thanks — recorded as CSAT.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h3>Context the model was given (JSON → prose)</h3>
+      <div class="body"><pre id="ctx">—</pre></div>
+    </div>
+  </div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <div id="dashView" class="hidden">
+    <div class="grid" id="stats"></div>
+    <div class="layout" style="margin-top:16px">
+      <div class="card">
+        <h3>Quality — LLM-as-judge</h3>
+        <div class="body" id="quality"></div>
+      </div>
+      <div class="card">
+        <h3>Escalation reasons</h3>
+        <div class="body" id="reasons" style="font-size:13px"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3>Actions — proposed vs. permitted</h3>
+      <div class="body" id="actions"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Action verification popup -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h4 id="mTitle">Confirm</h4>
+    <p id="mBody"></p>
+    <div class="row">
+      <button class="btn ghost" id="mNo">Not now</button>
+      <button class="btn" id="mYes">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let sessionId = null, pendingAction = null, rated = false;
+
+const api = async (path, body) => {
+  const res = await fetch(path, body ? {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  } : undefined);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+};
+
+/* ---------- chat rendering ---------- */
+function add(role, text, meta) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg " + role;
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.textContent = text;
+  if (meta) {
+    const m = document.createElement("div");
+    m.className = "meta";
+    m.textContent = meta;
+    b.appendChild(m);
+  }
+  wrap.appendChild(b);
+  $("#chat").appendChild(wrap);
+  $("#chat").scrollTop = $("#chat").scrollHeight;
+  return wrap;
+}
+
+function typing() {
+  const w = document.createElement("div");
+  w.className = "msg bot";
+  w.innerHTML = '<div class="bubble dots"><span>●</span><span>●</span><span>●</span></div>';
+  $("#chat").appendChild(w);
+  $("#chat").scrollTop = $("#chat").scrollHeight;
+  return w;
+}
+
+/* ---------- send a turn ---------- */
+async function send() {
+  const text = $("#input").value.trim();
+  if (!text || !sessionId) return;
+  $("#input").value = "";
+  $("#send").disabled = true;
+  add("me", text);
+  const t = typing();
+
+  try {
+    const r = await api("/api/chat", {session_id: sessionId, message: text});
+    t.remove();
+    const secs = (r.timings.total_ms / 1000).toFixed(1);
+    add("bot", r.reply, `${secs}s · ${r.intent} · $${r.usage.cost_usd.toFixed(5)}`);
+    renderTurn(r);
+    $("#ctx").textContent = r.context_used || "(no data was fetched for this turn)";
+
+    if (r.action && r.action.eligible) {
+      pendingAction = r.action;
+      $("#mTitle").textContent = r.action.button;
+      $("#mBody").textContent = r.action.prompt;
+      $("#mYes").textContent = r.action.button;
+      $("#overlay").classList.add("show");
+    }
+  } catch (e) {
+    t.remove();
+    add("sys", "Error: " + e.message);
+  } finally {
+    $("#send").disabled = false;
+    $("#input").focus();
+  }
+}
+
+/* ---------- right-hand turn inspector ---------- */
+function renderTurn(r) {
+  const esc = r.escalation || {};
+  const rows = [
+    ["Intent", r.intent],
+    ["Data fetched", (r.functions_called || []).join(", ") || "none"],
+    ["Response time", (r.timings.total_ms / 1000).toFixed(1) + "s"],
+    ["  ↳ classify", r.timings.classify_ms + "ms"],
+    ["  ↳ generate + action", r.timings.generate_ms + "ms"],
+    ["Cost", "$" + r.usage.cost_usd.toFixed(5)],
+    ["Tokens", `${r.usage.input_tokens} in / ${r.usage.output_tokens} out`],
+  ];
+  let html = rows.map(([k, v]) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`).join("");
+
+  html += `<div class="kv"><span>Contained</span><span>` +
+    (r.contained ? '<span class="pill ok">yes</span>' : '<span class="pill bad">escalated</span>') +
+    `</span></div>`;
+
+  if (esc.requested) {
+    html += `<div class="kv"><span>Escalation asked</span><span>${esc.code || "—"}</span></div>`;
+    html += `<div class="kv"><span>Policy layer</span><span>` +
+      (esc.upheld ? '<span class="pill warn">upheld</span>'
+                  : '<span class="pill ok">rejected</span>') + `</span></div>`;
+    html += `<div class="meta" style="margin-top:6px">${esc.evidence || ""}</div>`;
+  }
+
+  if (r.action && r.action.action !== "NONE") {
+    html += `<div class="kv" style="margin-top:6px"><span>Action</span><span>${r.action.action}</span></div>`;
+    html += `<div class="kv"><span>Eligibility</span><span>` +
+      (r.action.eligible ? '<span class="pill ok">permitted</span>'
+                         : '<span class="pill bad">blocked</span>') + `</span></div>`;
+    if (!r.action.eligible && r.action.reject_reason) {
+      html += `<div class="meta" style="margin-top:6px">${r.action.reject_reason}</div>`;
+    }
+  }
+
+  const g = r.guardrail || {};
+  if (g.violations && g.violations.length) {
+    html += `<div class="kv"><span>Guardrail</span><span>` +
+      (g.blocked ? '<span class="pill bad">blocked</span>' : '<span class="pill warn">flagged</span>') +
+      `</span></div>`;
+    html += `<div class="meta">${g.violations.map(v => v.code).join(", ")}</div>`;
+  }
+  $("#turnInfo").innerHTML = html;
+}
+
+/* ---------- action popup ---------- */
+$("#mYes").onclick = async () => {
+  $("#overlay").classList.remove("show");
+  if (!pendingAction) return;
+  try {
+    const r = await api("/api/action", {
+      session_id: sessionId, action: pendingAction.action,
+      order_id: pendingAction.order_id, parameter: pendingAction.parameter
+    });
+    add(r.ok ? "bot" : "sys", r.message);
+    loadOrders();
+  } catch (e) { add("sys", "Error: " + e.message); }
+  pendingAction = null;
+};
+$("#mNo").onclick = () => {
+  $("#overlay").classList.remove("show");
+  add("sys", "No problem — nothing has been changed.");
+  pendingAction = null;
+};
+
+/* ---------- account sidebar ---------- */
+async function loadOrders() {
+  const cid = $("#customer").value;
+  const orders = await api("/api/orders/" + cid);
+  $("#orders").innerHTML = orders.map(o => {
+    const when = o.status === "delivered"
+      ? `delivered ${Math.round(o.hours_since_delivery)}h ago`
+      : `placed ${o.placed_minutes_ago} min ago`;
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--line)">
+      <b>${o.order_id}</b> · ₹${o.total}<br>
+      <span style="color:var(--muted)">${o.restaurant}</span><br>
+      <span class="pill">${o.status.replace(/_/g," ")}</span>
+      <span style="color:var(--muted);font-size:12px"> ${when}</span>
+    </div>`;
+  }).join("") || "<span style='color:var(--muted)'>No orders.</span>";
+}
+
+/* ---------- session lifecycle ---------- */
+async function newChat() {
+  const cid = $("#customer").value;
+  const r = await api("/api/session", {customer_id: cid});
+  sessionId = r.session_id;
+  rated = false;
+  $("#chat").innerHTML = "";
+  $("#rateDone").classList.add("hidden");
+  $("#stars").classList.remove("hidden");
+  drawStars(0);
+  const name = $("#customer").selectedOptions[0].dataset.name;
+  add("bot", `Hi ${name}! I'm Zia. What can I help you with today?`);
+  $("#ctx").textContent = "—";
+  $("#turnInfo").innerHTML = '<div class="kv"><span>Waiting for a message…</span><span></span></div>';
+  loadOrders();
+}
+
+/* ---------- CSAT ---------- */
+function drawStars(n) {
+  $("#stars").innerHTML = [1,2,3,4,5].map(i =>
+    `<span class="star ${i <= n ? "on" : ""}" data-n="${i}">★</span>`).join("");
+  $("#stars").querySelectorAll(".star").forEach(s => {
+    s.onmouseenter = () => drawStars(+s.dataset.n);
+    s.onclick = async () => {
+      if (rated || !sessionId) return;
+      rated = true;
+      await api("/api/rating", {session_id: sessionId, rating: +s.dataset.n});
+      $("#stars").classList.add("hidden");
+      $("#rateDone").classList.remove("hidden");
+    };
+  });
+}
+
+/* ---------- dashboard ---------- */
+async function loadDash() {
+  const d = await api("/api/dashboard");
+  const pct = v => (v ?? 0).toFixed(1) + "%";
+  $("#stats").innerHTML = `
+    <div class="stat"><div class="label">CSAT</div>
+      <div class="value">${d.csat.average ?? "—"}</div>
+      <div class="sub">${d.csat.count} rating(s), out of 5</div></div>
+    <div class="stat"><div class="label">Containment</div>
+      <div class="value">${pct(d.containment.pct)}</div>
+      <div class="sub">${d.containment.contained}/${d.containment.total_sessions} chats kept by the bot</div>
+      <div class="bar"><i style="width:${Math.min(100, d.containment.pct)}%"></i></div></div>
+    <div class="stat"><div class="label">Response time p95</div>
+      <div class="value">${(d.response_time.p95_ms/1000).toFixed(1)}s</div>
+      <div class="sub">${pct(d.response_time.within_target_pct)} under the 10s target</div></div>
+    <div class="stat"><div class="label">Cost / chat</div>
+      <div class="value">$${(d.cost.per_session_usd ?? 0).toFixed(4)}</div>
+      <div class="sub">$${d.cost.total_usd.toFixed(4)} total · ${d.cost.input_tokens + d.cost.output_tokens} tokens</div></div>
+    <div class="stat"><div class="label">Escalations rejected</div>
+      <div class="value">${pct(d.containment.policy_rejection_pct)}</div>
+      <div class="sub">${d.containment.escalations_rejected_by_policy}/${d.containment.escalations_requested} unsupported by data</div></div>
+    <div class="stat"><div class="label">Guardrail blocks</div>
+      <div class="value">${d.guardrail.blocked_turns}</div>
+      <div class="sub">replies stopped before sending</div></div>`;
+
+  const q = d.quality;
+  const row = (k, v) => {
+    const p = Math.round((v || 0) * 100);
+    return `<div style="margin-bottom:11px">
+      <div class="kv" style="border:0;padding:0 0 3px"><span>${k}</span><span>${(v||0).toFixed(2)}</span></div>
+      <div class="bar"><i style="width:${p}%"></i></div></div>`;
+  };
+  $("#quality").innerHTML =
+    row("Factual consistency", q.factual_consistency) +
+    row("Information relevance", q.information_relevance) +
+    row("Guideline compliance", q.guideline_compliance) +
+    row("Pain point resolution", q.pain_point_resolution) +
+    `<div class="meta">${q.graded_turns} turn(s) graded by the LLM judge</div>`;
+
+  const reasons = Object.entries(d.escalation_reasons);
+  $("#reasons").innerHTML = reasons.length
+    ? reasons.map(([k,v]) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`).join("")
+    : "<span style='color:var(--muted)'>No escalations yet.</span>";
+
+  const a = d.actions;
+  $("#actions").innerHTML = `
+    <div class="kv"><span>Proposed by the classifier</span><span>${a.proposed}</span></div>
+    <div class="kv"><span>Passed eligibility check</span><span>${a.passed_verification}</span></div>
+    <div class="kv"><span>Blocked by verification</span><span>${a.blocked_by_verification}</span></div>
+    <div class="kv"><span>Executed after confirmation</span><span>${a.executed}</span></div>
+    ${Object.entries(a.by_type).map(([k,v]) =>
+      `<div class="kv"><span style="padding-left:12px">${k}</span><span>${v}</span></div>`).join("")}`;
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+  t.classList.add("active");
+  $("#chatView").classList.toggle("hidden", t.dataset.view !== "chatView");
+  $("#dashView").classList.toggle("hidden", t.dataset.view !== "dashView");
+  if (t.dataset.view === "dashView") loadDash();
+});
+$("#send").onclick = send;
+$("#input").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+$("#newChat").onclick = newChat;
+$("#customer").onchange = newChat;
+
+(async function init() {
+  const cs = await api("/api/customers");
+  $("#customer").innerHTML = cs.map(c =>
+    `<option value="${c.customer_id}" data-name="${c.name.split(" ")[0]}">
+       ${c.name} — ${c.live_orders.length} live order(s)</option>`).join("");
+  drawStars(0);
+  await newChat();
+})();
+</script>
+</body>
+</html>
